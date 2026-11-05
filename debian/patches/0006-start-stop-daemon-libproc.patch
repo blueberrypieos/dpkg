@@ -1,0 +1,71 @@
+Description: Fix Darwin libproc failure checks and process name matching
+ proc_pidpath() fails and returns 0 when its buffer is smaller than
+ PROC_PIDPATHINFO_SIZE. So the buffer is PROC_PIDPATHINFO_MAXSIZE, and 0
+ counts as failure. proc_pidinfo() succeeds only when it returns the
+ whole structure. A process is matched by its name, not its pathname. On
+ the other systems comm is that name too. These changes are placed in
+ the public domain, as utils/start-stop-daemon.c is.
+Author: The Blueberry Pie OS Authors
+Forwarded: no
+Last-Update: 2026-11-04
+
+--- a/utils/start-stop-daemon.c
++++ b/utils/start-stop-daemon.c
+@@ -21,6 +21,9 @@
+  *     port to OpenBSD.
+  *   2001 Ian Jackson
+  *     added --retry (and associated rearrangements).
++ *   2026 The Blueberry Pie OS Authors
++ *     Modified 2026-10-29 and 2026-11-04: Darwin libproc failure checks and
++ *     process name matching, placed in the public domain.
+  */
+ 
+ #include <config.h>
+@@ -1825,9 +1828,9 @@
+ pid_is_exec(pid_t pid, const struct stat *esb)
+ {
+ 	struct stat sb;
+-	char pathname[_POSIX_PATH_MAX];
++	char pathname[PROC_PIDPATHINFO_MAXSIZE];
+ 
+-	if (proc_pidpath(pid, pathname, sizeof(pathname)) < 0)
++	if (proc_pidpath(pid, pathname, sizeof(pathname)) <= 0)
+ 		return false;
+ 
+ 	if (stat(pathname, &sb) != 0)
+@@ -1963,7 +1966,8 @@
+ {
+ 	struct proc_bsdinfo pbi;
+ 
+-	if (proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &pbi, sizeof(pbi)) < 0)
++	if (proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &pbi, sizeof(pbi)) <
++	    (int)sizeof(pbi))
+ 		return false;
+ 
+ 	return (pid_t)pbi.pbi_ppid == ppid;
+@@ -2072,7 +2076,8 @@
+ {
+ 	struct proc_bsdinfo pbi;
+ 
+-	if (proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &pbi, sizeof(pbi)) < 0)
++	if (proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &pbi, sizeof(pbi)) <
++	    (int)sizeof(pbi))
+ 		return false;
+ 
+ 	return pbi.pbi_ruid == uid;
+@@ -2227,12 +2232,12 @@
+ static bool
+ pid_is_cmd(pid_t pid, const char *name)
+ {
+-	char pathname[_POSIX_PATH_MAX];
++	char comm[2 * MAXCOMLEN + 1];
+ 
+-	if (proc_pidpath(pid, pathname, sizeof(pathname)) < 0)
++	if (proc_name(pid, comm, sizeof(comm)) <= 0)
+ 		return false;
+ 
+-	return strcmp(pathname, name) == 0;
++	return strcmp(comm, name) == 0;
+ }
+ #elif defined(OS_FreeBSD)
+ static bool

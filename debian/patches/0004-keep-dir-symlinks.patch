@@ -1,0 +1,92 @@
+Description: Preserve Darwin system directory symlinks during removal
+ Darwin's /etc, /tmp and /var are symlinks to /private/etc, /private/tmp
+ and /private/var. A package with files under /etc lists "/etc" as one of
+ its directories, and removing it as a symlink to a directory would cut
+ the system off from /private/etc. dpkg keeps those. It also keeps any
+ other symlink to a directory that still has entries, as it keeps a
+ non-empty directory.
+Author: The Blueberry Pie OS Authors
+Forwarded: not-needed
+Last-Update: 2026-11-04
+
+--- a/src/main/remove.c
++++ b/src/main/remove.c
+@@ -18,6 +18,7 @@
+  * You should have received a copy of the GNU General Public License
+  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+  */
++/* Modified 2026-10-29 and 2026-11-04: Darwin system directory symlinks are kept on removal (GPL-2.0 section 2(a)). */
+ 
+ #include <config.h>
+ #include <compat.h>
+@@ -261,6 +262,46 @@
+   return shared;
+ }
+ 
++#if defined(__APPLE__) && defined(__MACH__)
++static bool
++removal_keep_dir_symlink(const char *pathname, const char *name)
++{
++  static const char *const private_links[] = { "/etc", "/tmp", "/var", NULL };
++  const char *const *link;
++  struct stat st;
++  struct dirent *dent;
++  DIR *dir;
++  bool keep = false;
++
++  if (lstat(pathname, &st) != 0 || !S_ISLNK(st.st_mode) ||
++      stat(pathname, &st) != 0 || !S_ISDIR(st.st_mode))
++    return false;
++
++  for (link = private_links; *link; link++)
++    if (strcmp(name, *link) == 0)
++      return true;
++
++  dir = opendir(pathname);
++  if (dir == NULL)
++    return false;
++  while ((dent = readdir(dir)) != NULL) {
++    if (strcmp(dent->d_name, ".") != 0 && strcmp(dent->d_name, "..") != 0) {
++      keep = true;
++      break;
++    }
++  }
++  closedir(dir);
++
++  return keep;
++}
++#else
++static bool
++removal_keep_dir_symlink(const char *pathname, const char *name)
++{
++  return false;
++}
++#endif
++
+ static void
+ removal_bulk_remove_files(struct pkginfo *pkg)
+ {
+@@ -359,6 +400,10 @@
+       }
+       if (errno != ENOTDIR)
+         ohshite(_("cannot remove '%.250s'"), fnvb.buf);
++      if (removal_keep_dir_symlink(fnvb.buf, usenode->name)) {
++        push_leftover(&leftover, namenode);
++        continue;
++      }
+       debug(dbg_eachfiledetail, "removal_bulk unlinking '%s'", fnvb.buf);
+       if (secure_unlink(fnvb.buf))
+         ohshite(_("unable to securely remove '%.250s'"), fnvb.buf);
+@@ -453,6 +498,12 @@
+     if (errno != ENOTDIR)
+       ohshite(_("cannot remove '%.250s'"), fnvb.buf);
+ 
++    if (removal_keep_dir_symlink(fnvb.buf, usenode->name)) {
++      debug(dbg_eachfiledetail, "removal_bulk keeping symlink '%s'", fnvb.buf);
++      push_leftover(&leftover, namenode);
++      continue;
++    }
++
+     if (lstat(fnvb.buf, &stab) == 0 && S_ISLNK(stab.st_mode)) {
+       debug(dbg_eachfiledetail, "removal_bulk is a symlink to a directory");
+ 

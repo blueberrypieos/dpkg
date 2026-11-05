@@ -1,0 +1,7 @@
+0001-no-gettext.patch
+0002-bsdtar.patch
+0003-no-update-dyld-shared-cache.patch
+0004-keep-dir-symlinks.patch
+0005-darwin-negative-ids.patch
+0006-start-stop-daemon-libproc.patch
+0007-configure-c-tools-only.patch

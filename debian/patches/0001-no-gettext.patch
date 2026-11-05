@@ -1,0 +1,84 @@
+Description: Disable gettext and translated manuals for the C tools build
+ The build host need not have gettext, and there is no libintl. So there
+ is no NLS. configure sets USE_NLS to no and substitutes empty LIBINTL
+ and LTLIBINTL. The po/ directories and the translated manuals are not
+ built.
+Author: The Blueberry Pie OS Authors
+Forwarded: not-needed
+Last-Update: 2026-11-04
+
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -1,4 +1,5 @@
+ ## Process this file with automake to produce Makefile.in
++# Modified 2026-10-29: no gettext and no translated manuals (GPL-2.0 section 2(a)).
+ 
+ if BUILD_DSELECT
+   MAYBE_DSELECT = dselect
+@@ -10,7 +11,6 @@
+ 	utils \
+ 	$(MAYBE_DSELECT) \
+ 	scripts \
+-	po \
+ 	man \
+ 	# EOL
+ 
+--- a/configure.ac
++++ b/configure.ac
+@@ -1,4 +1,5 @@
+ # Process this file with autoconf to produce a configure script.
++# Modified 2026-10-29, 2026-10-30 and 2026-11-04: no gettext and no translated manuals (GPL-2.0 section 2(a)).
+ 
+ m4_pattern_forbid([^_?DPKG_])
+ 
+@@ -30,16 +31,10 @@
+ )
+ AM_SILENT_RULES([yes])
+ 
+-# Require at least this gettext version, but will take any later version too.
+-AM_GNU_GETTEXT_REQUIRE_VERSION([0.19.8])
+-# XXX: We cannot remove the following macro due to backwards compatibility
+-# reasons. The above macro is set unconditionally to the minimal version
+-# required, and the below is set to 0.19.6, the first version introducing
+-# the AM_GNU_GETTEXT_REQUIRE_VERSION macro.
+-AM_GNU_GETTEXT_VERSION([0.19.6])
+-AM_GNU_GETTEXT([external])
+-DPKG_DIST_CHECK([test "$GMSGFMT" = ":" && test "$USE_NLS" = "yes"],
+-  [gettext required when NLS support enabled])
++USE_NLS=no
++AC_SUBST([USE_NLS])
++AC_SUBST([LIBINTL])
++AC_SUBST([LTLIBINTL])
+ 
+ # Shared libraries are disabled on purpose, currently there is no ABI stability
+ # guarantee, and it will be broken at will. The infrastructure is in place just
+@@ -101,7 +96,8 @@
+ AC_CHECK_PROGS([DOXYGEN], [doxygen])
+ AC_CHECK_PROG([HAVE_DOT], [dot], [YES], [NO])
+ DPKG_PROG_TAR
+-DPKG_PROG_PO4A
++USE_PO4A=no
++AC_SUBST([USE_PO4A])
+ DPKG_PROG_PERL
+ DPKG_PROG_POD2MAN
+ DPKG_CODE_COVERAGE
+@@ -256,19 +252,16 @@
+   Makefile
+   dselect/Makefile
+   dselect/methods/Makefile
+-  dselect/po/Makefile.in
+   lib/Makefile
+   lib/compat/Makefile
+   lib/dpkg/Makefile
+   lib/dpkg/libdpkg.pc
+   doc/Doxyfile
+   man/Makefile
+-  po/Makefile.in
+   scripts/Build.PL
+   scripts/Makefile
+   scripts/README.cpan
+   scripts/mk/Makefile
+-  scripts/po/Makefile.in
+   src/Makefile
+   src/at/atlocal
+   utils/Makefile

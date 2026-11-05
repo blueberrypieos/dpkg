@@ -1,0 +1,56 @@
+Description: Read Darwin negative account IDs and skip account file comments
+ Darwin's account files have negative ids: nobody is -2 and nogroup is
+ -1. Libinfo reads them as the unsigned ids (uid_t)-2 and (gid_t)-1. The
+ compat getent code does the same, rather than take them for root.
+ Darwin's passwd and group files start with comments, which it skips.
+Author: The Blueberry Pie OS Authors
+Forwarded: no
+Last-Update: 2026-11-04
+
+--- a/lib/compat/getent.c
++++ b/lib/compat/getent.c
+@@ -16,6 +16,7 @@
+  * You should have received a copy of the GNU General Public License
+  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+  */
++/* Modified 2026-10-29 and 2026-11-04: negative account IDs are read and comment lines are skipped (GPL-2.0 section 2(a)). */
+ 
+ #include <config.h>
+ 
+@@ -119,6 +120,14 @@
+ 	field = parse_field(start, delim);
+ 	if (field == NULL)
+ 		return 0;
++#ifdef __APPLE__
++	if (field[0] == '-') {
++		id = parse_intmax(field + 1);
++		if (id <= 0 || id > INT32_MAX)
++			return 0;
++		return (uint32_t)-id;
++	}
++#endif
+ 	id = parse_intmax(field);
+ 	if (id < 0)
+ 		return 0;
+@@ -153,6 +162,10 @@
+ 		if (len > 0 && line[len - 1] == '\n')
+ 			line[len - 1] = '\0';
+ 		cur = line;
++#ifdef __APPLE__
++		if (line[0] == '#')
++			continue;
++#endif
+ 
+ 		PARSE_FIELD_STR(pw.pw_name);
+ 
+@@ -204,6 +217,10 @@
+ 		if (len > 0 && line[len - 1] == '\n')
+ 			line[len - 1] = '\0';
+ 		cur = line;
++#ifdef __APPLE__
++		if (line[0] == '#')
++			continue;
++#endif
+ 
+ 		PARSE_FIELD_STR(gr.gr_name);
+ 

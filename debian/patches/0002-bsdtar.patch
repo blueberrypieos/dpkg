@@ -1,0 +1,66 @@
+Description: Use Darwin bsdtar without GNU-only options or extended metadata
+ Darwin's tar is bsdtar. It has no --mtime, --clamp-mtime, --mode or
+ --no-unquote, so on Darwin dpkg-deb does not pass them. It passes
+ --no-mac-metadata, --no-xattrs, --no-acls and --no-fflags, so the
+ archive has no ._ metadata, extended attribute, ACL or file flag
+ entries. It passes --format=gnutar, bsdtar's name for the GNU format,
+ where upstream passes --format=gnu. Extraction does not pass
+ --warning=no-timestamp.
+Author: The Blueberry Pie OS Authors
+Forwarded: not-needed
+Last-Update: 2026-11-04
+
+--- a/src/deb/build.c
++++ b/src/deb/build.c
+@@ -19,6 +19,7 @@
+  * You should have received a copy of the GNU General Public License
+  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+  */
++/* Modified 2026-10-29 and 2026-11-04: Darwin bsdtar without GNU-only options or extended metadata (GPL-2.0 section 2(a)). */
+ 
+ #include <config.h>
+ #include <compat.h>
+@@ -527,6 +528,15 @@
+     snprintf(mtime, sizeof(mtime), "@%jd", options->timestamp);
+ 
+     command_init(&cmd, TAR, "tar -cf");
++#ifdef __APPLE__
++    (void)mtime;
++    command_add_args(&cmd, "tar", "-cf", "-", "--format=gnutar",
++                           "--no-mac-metadata", "--no-xattrs", "--no-acls",
++                           "--no-fflags", NULL);
++    if (options->root_owner_group)
++      command_add_args(&cmd, "--owner", "root:0", "--group", "root:0", NULL);
++    command_add_args(&cmd, "--null", "--no-recursion", "-T", "-", NULL);
++#else
+     command_add_args(&cmd, "tar", "-cf", "-", "--format=gnu",
+                            "--mtime", mtime, "--clamp-mtime", NULL);
+     /* Mode might become a positional argument, pass it before -T. */
+@@ -536,6 +546,7 @@
+       command_add_args(&cmd, "--owner", "root:0", "--group", "root:0", NULL);
+     command_add_args(&cmd, "--null", "--no-unquote", "--no-recursion",
+                            "-T", "-", NULL);
++#endif
+     command_exec(&cmd);
+   }
+   close(pipe_filenames[0]);
+--- a/src/deb/extract.c
++++ b/src/deb/extract.c
+@@ -18,6 +18,7 @@
+  * You should have received a copy of the GNU General Public License
+  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+  */
++/* Modified 2026-10-29: Darwin bsdtar without GNU-only options (GPL-2.0 section 2(a)). */
+ 
+ #include <config.h>
+ #include <compat.h>
+@@ -338,7 +339,9 @@
+ 
+       command_add_arg(&cmd, "-f");
+       command_add_arg(&cmd, "-");
++#ifndef __APPLE__
+       command_add_arg(&cmd, "--warning=no-timestamp");
++#endif
+ 
+       m_dup2(p2[0],0);
+       close(p2[0]);

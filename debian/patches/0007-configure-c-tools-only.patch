@@ -1,0 +1,87 @@
+Description: Only what the C tools need is configured
+ The package ships only the C tools. configure.ac does not make
+ dselect's Makefiles, the Perl scripts' Makefiles, libdpkg.pc, the
+ Doxyfile, the Perl module's Build.PL and README.cpan, or the test
+ suite's atlocal, and does not look for curses, which only dselect
+ uses. The top Makefile does not build dselect or scripts/, does not
+ install m4/dpkg-unicode.m4, and does not include the CPAN recipe. So
+ configure and automake do not read their templates and inputs.
+Author: The Blueberry Pie OS Authors
+Forwarded: not-needed
+Last-Update: 2026-11-04
+
+--- a/configure.ac
++++ b/configure.ac
+@@ -1,5 +1,6 @@
+ # Process this file with autoconf to produce a configure script.
+ # Modified 2026-10-29, 2026-10-30 and 2026-11-04: no gettext and no translated manuals (GPL-2.0 section 2(a)).
++# Modified 2026-11-04: only what the C tools need is configured (GPL-2.0 section 2(a)).
+ 
+ m4_pattern_forbid([^_?DPKG_])
+ 
+@@ -113,9 +114,6 @@
+ DPKG_LIB_LZMA
+ DPKG_LIB_ZSTD
+ DPKG_LIB_SELINUX
+-AS_IF([test "$build_dselect" = "yes"], [
+-  DPKG_LIB_CURSES
+-])
+ AS_IF([test "$build_start_stop_daemon" = "yes"], [
+   DPKG_LIB_SOCKET
+   DPKG_LIB_PS
+@@ -250,20 +248,11 @@
+ 
+ AC_CONFIG_FILES([
+   Makefile
+-  dselect/Makefile
+-  dselect/methods/Makefile
+   lib/Makefile
+   lib/compat/Makefile
+   lib/dpkg/Makefile
+-  lib/dpkg/libdpkg.pc
+-  doc/Doxyfile
+   man/Makefile
+-  scripts/Build.PL
+-  scripts/Makefile
+-  scripts/README.cpan
+-  scripts/mk/Makefile
+   src/Makefile
+-  src/at/atlocal
+   utils/Makefile
+ ])
+ AC_CONFIG_HEADERS([config.h])
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -1,5 +1,6 @@
+ ## Process this file with automake to produce Makefile.in
+ # Modified 2026-10-29: no gettext and no translated manuals (GPL-2.0 section 2(a)).
++# Modified 2026-11-04: only what the C tools need is built (GPL-2.0 section 2(a)).
+ 
+ if BUILD_DSELECT
+   MAYBE_DSELECT = dselect
+@@ -9,8 +10,6 @@
+ 	lib \
+ 	src \
+ 	utils \
+-	$(MAYBE_DSELECT) \
+-	scripts \
+ 	man \
+ 	# EOL
+ 
+@@ -27,7 +26,6 @@
+ 	m4/dpkg-linker.m4 \
+ 	m4/dpkg-progs.m4 \
+ 	m4/dpkg-types.m4 \
+-	m4/dpkg-unicode.m4 \
+ 	# EOL
+ 
+ dist_pkgdata_DATA = \
+@@ -231,8 +229,6 @@
+ 	$(MAKE) -C dselect/po update-po
+ 	$(MAKE) -C man update-po
+ 
+-include $(top_srcdir)/build-aux/cpan.am
+-
+ # If we create the dist tarball from the git repository, make sure
+ # that we're not forgetting some files, and we are not storing any symlink
+ # in the repository (except for the origins/default one) as those degrade

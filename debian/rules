@@ -1,88 +1,82 @@
 #!/usr/bin/make -f
-# debian/rules for the dpkg suite.
-# Copyright © 2004 Scott James Remnant <scott@netsplit.com>
-# Copyright © 2006-2012 Guillem Jover <guillem@debian.org>
+# SPDX-License-Identifier: BSD-2-Clause
+# Copyright (c) 2026 The Blueberry Pie OS Authors
 
-WFLAGS := \
-	-Wall -Wextra \
-	-Wno-missing-field-initializers \
-	-Wno-nonnull-compare \
-	-Wno-unused-parameter \
-	# EOL
-
-export DEB_BUILD_MAINT_OPTIONS = hardening=+all
-export DEB_CFLAGS_MAINT_APPEND = $(WFLAGS)
-export DEB_CXXFLAGS_MAINT_APPEND = $(WFLAGS)
-
-# Use the in-tree dpkg-buildflags
-dpkg_buildflags = \
-	DEB_BUILD_MAINT_OPTIONS="$(DEB_BUILD_MAINT_OPTIONS)" \
-	DEB_CFLAGS_MAINT_APPEND="$(WFLAGS)" \
-	DEB_CXXFLAGS_MAINT_APPEND="$(WFLAGS)" \
-	$(CURDIR)/build-aux/run-script scripts/dpkg-buildflags.pl
-
-# Do not enable everything on all platforms.
-ifeq ($(DEB_HOST_ARCH_OS),linux)
-	confflags += --with-libselinux
+ifneq ($(shell pwd -P | LC_ALL=C awk '!/^[A-Za-z0-9\/._+~-]+$$/ { bad = 1 } END { print ((bad || NR != 1) ? "bad" : "ok") }'),ok)
+$(error debian/rules: the path of the tree may have only letters, digits and /._+~-: $(CURDIR))
 endif
-ifeq (,$(filter terse,$(DEB_BUILD_OPTIONS)))
-  testflags += TEST_VERBOSE=1
+ifneq ($(CURDIR),$(shell pwd -P))
+$(error debian/rules: make does not see the path of the tree as the shell does)
+endif
+ifneq ($(shell test -L debian -o -L debian/build -o -L debian/files.new && echo link; \
+	test -d debian/build && find debian/build -mindepth 1 -maxdepth 1 -type l; \
+	test -d debian/build/pie && find debian/build/pie -mindepth 1 -type l \( -xtype d -o \
+		\( ! -path debian/build/pie/bin/install_name_tool ! -path debian/build/pie/bin/otool \) \)),)
+$(error debian/rules: debian, debian/build or something rules.mk writes in it is a symlink)
 endif
 
-# Enable parallel test suite
-NUMJOBS = 1
-ifneq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
-  NUMJOBS = $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
-  testflags += TEST_PARALLEL=$(NUMJOBS)
-endif
+include /usr/share/pietoolchain/rules.mk
 
-dpkg_vendor = \
-	$(CURDIR)/build-aux/run-script scripts/dpkg-vendor.pl
+SRC := $(W)/src
+export PIE_REPRO_SOURCE := $(SRC)
 
-DEB_VENDOR = $(shell $(call dpkg_vendor) --query Vendor)
+DPKG_CFLAGS  := $(BASE_CFLAGS)
+BINUTILS := $(TOOLCHAIN)/prefix/bin/aarch64-apple-darwin
+DPKG_LDFLAGS := $(BASE_LDFLAGS)
+DPKG_CPPFLAGS := $(ARCHFLAGS) -isysroot $(SYSROOT) $(MINVER)
+CONFIGURE_FLAGS := --host=aarch64-apple-darwin --build=$(shell uname -m)-pc-linux-gnu \
+	--prefix=/usr --sysconfdir=/etc --localstatedir=/var --libexecdir=/usr/libexec \
+	--with-admindir=/var/lib/dpkg --disable-dselect --disable-devel-docs \
+	--with-libz --with-liblzma --with-libbz2 \
+	--without-libzstd --without-libselinux
+CONFIGURE_VARS := ac_cv_search_MD5Init="none required"
+CONFIGURE_VARS += DPKG_PAGER=less
 
-D := $(CURDIR)/debian/tmp
+all: $(OBJ)/.built
 
-%:
-	dh $@ --builddirectory=build-tree
+$(OBJ)/.configured:
+	rm -rf $(SRC) $(OBJ) && mkdir -p $(SRC) $(OBJ)
+	cd $(SRCROOT) && find . -mindepth 1 -maxdepth 1 ! -name debian ! -name .pc ! -name .git -exec cp -a -t $(SRC) -- {} +
+	mkdir -p $(SRC)/debian && cp -a debian/changelog $(SRC)/debian/
+	cd $(SRC) && find . -type l -exec sh -c 's=$$(pwd -P); for l; do case "$$(realpath -m -- "$$l")" in "$$s"|"$$s"/*) ;; *) echo "debian/rules: $$l leads outside the copy" >&2; exit 1;; esac; done' sh {} +
+	echo $(PIE_UPSTREAM_VERSION) > $(SRC)/.dist-version
+	sed -n 's/^ commit //p' debian/copyright > $(SRC)/.dist-vcs-id && test -s $(SRC)/.dist-vcs-id
+	cd $(SRC) && autoreconf -fi > $(OBJ)/autoreconf.log 2>&1 || { cat $(OBJ)/autoreconf.log; exit 1; }
+	cd $(OBJ) && CC=$(CC) CXX=$(CXX) CFLAGS="$(DPKG_CFLAGS)" CXXFLAGS="$(DPKG_CFLAGS)" \
+		LDFLAGS="$(DPKG_LDFLAGS)" CPPFLAGS="$(DPKG_CPPFLAGS)" \
+		AR=$(BINUTILS)-ar RANLIB=$(BINUTILS)-ranlib NM=$(NM) STRIP=$(STRIP) \
+		$(SRC)/configure $(CONFIGURE_FLAGS) $(CONFIGURE_VARS) > configure.log
+	touch $@
 
-override_dh_auto_configure:
-	dh_auto_configure -- \
-		$(confflags) \
-		$(shell $(dpkg_buildflags) --export=configure) \
-		--libexecdir=\$${exec_prefix}/lib \
-		--with-devlibdir=\$${prefix}/lib/$(DEB_HOST_MULTIARCH) \
-		--with-libz \
-		--with-liblzma \
-		--with-libzstd \
-		--with-libbz2 \
-		# EOL
+$(OBJ)/.built: $(OBJ)/.configured
+	$(MAKE) -C $(OBJ)/lib/compat libcompat.la
+	$(MAKE) -C $(OBJ)/lib/dpkg libdpkg.la EXTRA_libdpkg_la_DEPENDENCIES= libdpkg_la_LDFLAGS=-no-undefined
+	$(MAKE) -C $(OBJ)/src $(filter-out update-alternatives,$(BINS))
+	$(MAKE) -C $(OBJ)/utils update-alternatives start-stop-daemon
+	touch $@
 
-execute_after_dh_auto_install:
-	# Special-case the lintian profile, as dh cannot rename on install.
-	mkdir -p $(D)/usr/share/lintian/profiles/dpkg
-	cp debian/dpkg.lintian-profile \
-	   $(D)/usr/share/lintian/profiles/dpkg/main.profile
+BINS := dpkg dpkg-deb dpkg-query dpkg-split dpkg-divert dpkg-statoverride \
+	dpkg-trigger dpkg-realpath dpkg-maintscript-helper update-alternatives
+DPKG_MANS := $(addsuffix .1,$(BINS)) start-stop-daemon.8 dpkg.cfg.5 deb.5 deb-control.5 \
+	deb-conffiles.5 deb-md5sums.5 deb-triggers.5 deb-preinst.5 deb-postinst.5 deb-prerm.5 \
+	deb-postrm.5 deb-split.5 deb-old.5 deb822.5 deb-version.7
 
-override_dh_auto_test:
-	dh_auto_test -- $(testflags)
+install: all
+	rm -rf $(OBJ)/stage
+	$(MAKE) -C $(OBJ)/src install-binPROGRAMS install-binSCRIPTS install-nobase_dist_pkgdataDATA DESTDIR=$(OBJ)/stage
+	$(MAKE) -C $(OBJ)/utils install-binPROGRAMS install-sbinPROGRAMS DESTDIR=$(OBJ)/stage
+	install -d $(ROOT)/usr/bin $(ROOT)/usr/sbin $(ROOT)/usr/share/dpkg/sh
+	set -e; for b in $(BINS); do install -m 755 $(OBJ)/stage/usr/bin/$$b $(ROOT)/usr/bin/; done
+	install -m 755 $(OBJ)/stage/usr/sbin/start-stop-daemon $(ROOT)/usr/sbin/
+	install -m 644 $(OBJ)/stage/usr/share/dpkg/sh/dpkg-error.sh $(ROOT)/usr/share/dpkg/sh/
+	install -m 644 $(addprefix $(SRCROOT)/data/,cputable ostable abitable tupletable) \
+		$(ROOT)/usr/share/dpkg/
+	install -d $(ROOT)/etc/dpkg/dpkg.cfg.d $(ROOT)/etc/alternatives
+	install -m 644 $(SRCROOT)/debian/dpkg.cfg $(ROOT)/etc/dpkg/
+	install -m 644 $(SRCROOT)/utils/README.alternatives $(ROOT)/etc/alternatives/README
+	install -d $(addprefix $(ROOT)/var/lib/dpkg/,info updates parts alternatives triggers)
+	$(MAKE) -C $(OBJ)/man $(DPKG_MANS)
+	set -e; for m in $(DPKG_MANS); do install -d $(ROOT)/usr/share/man/man$${m##*.}; \
+		install -m 644 $(OBJ)/man/$$m $(ROOT)/usr/share/man/man$${m##*.}/; done
 
-override_dh_installsystemd:
-	dh_installsystemd -a --name=dpkg-db-backup \
-	  --no-start --no-stop-on-upgrade
-
-execute_after_dh_installlogrotate:
-	dh_installlogrotate --name=alternatives
-
-override_dh_installdocs:
-	dh_installdocs -Ndpkg-dev
-	dh_installdocs -pdpkg-dev --doc-main-package=dpkg
-
-override_dh_installchangelogs:
-	dh_installchangelogs --no-trim
-
-override_dh_bugfiles:
-	dh_bugfiles -A
-
-override_dh_compress:
-	dh_compress -Xspec/
+.PHONY: all install
