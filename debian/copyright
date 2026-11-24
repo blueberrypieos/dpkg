@@ -309,17 +309,59 @@ Files: debian/*
 Copyright: 2026 The Blueberry Pie OS Authors
 License: BSD-2-Clause
 
-Files: debian/patches/*
-Copyright: 2026 The Blueberry Pie OS Authors
+Files: debian/patches/0001-no-gettext.patch
+ debian/patches/0002-bsdtar.patch
+ debian/patches/0003-no-update-dyld-shared-cache.patch
+ debian/patches/0004-keep-dir-symlinks.patch
+ debian/patches/0005-darwin-negative-ids.patch
+ debian/patches/0007-configure-c-tools-only.patch
+Copyright: 1994-1999, 2007-2008 Ian Jackson <ijackson@chiark.greenend.org.uk>
+ 1995 Ian Murdock
+ 1995 Raul Miller
+ 1995 Bruce Perens
+ 1996 Juho Vuori <javuori@cc.helsinki.fi>
+ 1996-1998 Christian Schwarz
+ 1997-1998 Charles Briscoe-Smith
+ 1999 Jim Van Zandt <jrv@vanzandt.mv.com>
+ 1999 Klee Dienes <klee@mit.edu>
+ 1999 Ben Collins <bcollins@debian.org>
+ 1999-2001 Marcus Brinkmann <brinkmd@debian.org>
+ 1999-2003 Wichert Akkerman <wakkerma@debian.org>
+ 2000, 2008 Joey Hess <joeyh@debian.org>
+ 2000-2003 Adam Heath <doogie@debian.org>
+ 2002 Josip Rodin <joy@debian.org>
+ 2003 Daniel Silverstone <dsilvers@digital-scurf.org>
+ 2004 Changwoo Ryu <cwryu@debian.org>
+ 2004-2005 Scott James Remnant <scott@netsplit.com>
+ 2005-2008 Frank Lichtenheld <djpig@debian.org>
+ 2006 Nicolas François <nicolas.francois@centraliens.net>
+ 2006-2025 Guillem Jover <guillem@debian.org>
+ 2007 Don Armstrong <don@donarmstrong.com>
+ 2007-2008 Tollef Fog Heen <tfheen@err.no>
+ 2007-2010 Canonical Ltd.
+ 2007-2012, 2014 Raphaël Hertzog <hertzog@debian.org>
+ 2008 James Westby <jw+debian@jameswestby.net>
+ 2008 Pierre Habouzit <madcoder@debian.org>
+ 2009 Romain Francoise <rfrancoise@debian.org>
+ 2009-2011 Kees Cook <kees@debian.org>
+ 2011 Linaro Limited
+ 2020 Helmut Grohne <helmut@subdivi.de>
+ 2021 Sebastian Andrzej Siewior <sebastian@breakpoint.cc>
+ 2022 Simon Richter <sjr@debian.org>
+ Colin Watson <cjwatson@debian.org>
+ 2026 The Blueberry Pie OS Authors
 License: GPL-2.0-or-later
 
 Files: debian/patches/0006-start-stop-daemon-libproc.patch
-Copyright: 2026 The Blueberry Pie OS Authors
-License: LicenseRef-PIE-public-domain
-
-Files: debian/patches/series
-Copyright: 2026 The Blueberry Pie OS Authors
-License: BSD-2-Clause
+Copyright: 1999 Marek Michalkiewicz <marekm@i17linuxb.ists.pwr.wroc.pl>
+ 1999 Christian Schwarz <schwarz@monet.m.isar.de>
+ 1999 Klee Dienes <klee@debian.org>
+ 1999 Ben Collins <bcollins@debian.org>
+ 2001 Sontri Tomo Huynh <huynh.29@osu.edu>
+ 2001 Andreas Schuldei <andreas@schuldei.org>
+ 2001 Ian Jackson <ijackson@chiark.greenend.org.uk>
+ 2026 The Blueberry Pie OS Authors
+License: public-domain AND LicenseRef-PIE-public-domain
 
 Files: debian/dpkg.cfg
 Copyright: 2000 Wichert Akkerman
